@@ -35,5 +35,4 @@ message ResultResponse {
 enum Status {
     FAIL = 0;
     SUCCESS = 1;
-    EXCEPION = 2;
 }
