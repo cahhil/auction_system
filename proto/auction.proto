@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package auction_system;
+
+option go_package = "proto/auction"; 
+
+service AuctionService {
+    //the client can bid on an item
+    rpc Bid (BidRequest) returns (BidResponse) {}
+    //the client can get the current highest bid alongside the highest bidder
+    rpc Result (ResultRequest) returns (ResultResponse) {}
+}
+
+message BidRequest {
+    int32 amount = 1;
+    int32 bidderId = 2;
+}
+
+message BidResponse {
+    int32 clientId = 1;
+    int32 bestBid = 2;
+    Status status = 3;  
+}
+
+message ResultRequest {
+    int32 clientId = 1;
+}
+
+message ResultResponse {
+    int32 currentBid = 1;
+    int32 highestBidderId = 2;
+    int32 highestBid = 3;
+}   
+
+enum Status {
+    FAIL = 0;
+    SUCCESS = 1;
+    EXCEPION = 2;
+}
