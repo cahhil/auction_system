@@ -11,29 +11,19 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Client struct {
-	auction.AuctionServiceClient
-	ctx              context.Context
-	id               int32
-	serverPorts      []int32
-	serverConnecions []*auction.AuctionServiceClient
-}
+var client_obj auction.AuctionServiceClient
 
 func main() {
+	conn, client_obj := connect_to_server()
 
-	client_obj := &Client{
-		ctx: context.Background(),
-		id:  0,
-	}
-	client_obj.startConnection()
-
+	defer conn.Close()
 	for {
 		read_input(client_obj)
 	}
 
 }
 
-func read_input(client_obj *Client) {
+func read_input(client_obj auction.AuctionServiceClient) {
 	scanner := bufio.NewScanner(os.Stdin)
 	log.Println("Type the keyword 'bid' to make a new bid or alternatively type 'result' to retrieve the highest bid")
 
@@ -45,7 +35,7 @@ func read_input(client_obj *Client) {
 		case text == "result":
 
 			result_obj := &auction.ResultRequest{}
-			result, err := client_obj.Result(client_obj.ctx, result_obj)
+			result, err := client_obj.Result(context.Background(), result_obj)
 			if err != nil {
 				log.Fatalf("could not retrieve the result: %v", err)
 			}
@@ -61,8 +51,7 @@ func read_input(client_obj *Client) {
 			}
 
 			bid := &auction.BidRequest{
-				Amount:   int32(amount),
-				BidderId: client_obj.id,
+				Amount: int32(amount),
 			}
 
 			acknoledgement, err := client_obj.Bid(context.Background(), bid)
@@ -80,13 +69,13 @@ func read_input(client_obj *Client) {
 	}
 }
 
-func (c *Client) startConnection() {
+// just an helper method to connect to the server
+// returns the connection and the client object
+func connect_to_server() (*grpc.ClientConn, auction.AuctionServiceClient) {
+
 	conn, err := grpc.Dial("localhost:8000", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("Did not connect: %v", err)
 	}
-	defer conn.Close()
-	auction_client := auction.NewAuctionServiceClient(conn)
-	log.Println("The client is now connected to the server", auction_client)
-
+	return conn, auction.NewAuctionServiceClient(conn)
 }

@@ -13,13 +13,11 @@ service AuctionService {
 
 message BidRequest {
     int32 amount = 1;
-    int32 bidderId = 2;
+    int32 BidderID = 2;
 }
 
 message BidResponse {
-    int32 clientId = 1;
-    int32 bestBid = 2;
-    Status status = 3;  
+   Status status = 1;  
 }
 
 message ResultRequest {
@@ -27,9 +25,8 @@ message ResultRequest {
 }
 
 message ResultResponse {
-    int32 currentBid = 1;
-    int32 highestBidderId = 2;
-    int32 highestBid = 3;
+    int32 highestBidderId = 1;
+    int32 highestBid = 2;
 }   
 
 enum Status {

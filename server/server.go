@@ -18,7 +18,7 @@ type server struct {
 	ctx           context.Context
 	mutex         sync.Mutex
 	port          int32
-	currentBid    int32
+	highestBid    int32
 	highestBidder int32
 	clients       []int32
 	clientCounter int32
@@ -37,7 +37,7 @@ func main() {
 	server := &server{
 		ctx:        ctx,
 		port:       ownPort,
-		currentBid: 0,
+		highestBid: 0,
 		mutex:      sync.Mutex{},
 		clients:    make([]int32, 5),
 	}
@@ -47,7 +47,7 @@ func main() {
 
 	<-timer.C
 	log.Printf("Timer expired, the auction is over. The winner is client %v with a bid of %v",
-		server.highestBidder, server.currentBid)
+		server.highestBidder, server.highestBid)
 }
 
 func initServer(server *server) {
@@ -74,16 +74,15 @@ func initServer(server *server) {
 // and returning a BidResponse as output
 func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidResponse, error) {
 
-	var highestBid int32
 	var status_obj status.Status
 
-	id := in.BidderId
+	id := in.BidderID
 
 	//check if the client is already registered
 	//when creating a client in the client.go
 	//set his id to be zero so
 	//initizalizatino routine can be run
-	if in.BidderId == 0 {
+	if in.BidderID == 0 {
 		//update the client id
 		//and add it to the list of clients
 		s.mutex.Lock()
@@ -94,16 +93,16 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 
 	}
 
-	if in.Amount > s.currentBid {
+	if in.Amount > s.highestBid {
 		//status code 1 means OK
 		status_obj = status.Status{
 			Code:    1,
-			Message: "Your bid is higher tahn the current bid",
+			Message: "You're winning, your bid is higher than the highest bid",
 		}
 		s.mutex.Lock()
-		//if the incoming bid is higehr than the current bid,
+		//if the incoming bid is higher than the current bid,
 		//update the current bid and the highest bidder
-		s.currentBid = in.Amount
+		s.highestBid = in.Amount
 		s.clients = append(s.clients, id)
 		s.highestBidder = id
 
@@ -115,21 +114,16 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 		//status code 1 means error
 		status_obj = status.Status{
 			Code:    1,
-			Message: "Your bid is lower than the current bid",
+			Message: "Your bid is lower than the current bid, place a higher one...",
 		}
-		s.mutex.Lock()
-		highestBid = s.currentBid
-		s.mutex.Unlock()
 	}
 
-	return &auction.BidResponse{ClientId: id, BestBid: highestBid, Status: auction.Status(status_obj.Code)}, nil
+	return &auction.BidResponse{Status: auction.Status(status_obj.Code)}, nil
 }
 
 // the implementation of the Result method taking a context and a ResultRequest as input
 // and returning a ResultResponse as output
 func (s *server) Result(ctx context.Context, in *auction.ResultRequest) (*auction.ResultResponse, error) {
 
-	//TODO: clarify confusuion there is between "currentBid" and the highest bid
-	//what does current bid mean? the highest bid or the latest bid?
-	return &auction.ResultResponse{CurrentBid: s.currentBid, HighestBidderId: s.highestBidder, HighestBid: s.currentBid}, nil
+	return &auction.ResultResponse{HighestBidderId: s.highestBidder, HighestBid: s.highestBid}, nil
 }
