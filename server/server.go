@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+var terminate = 0
 type server struct {
 	auction.UnimplementedAuctionServiceServer
 	ctx               context.Context
@@ -133,11 +134,11 @@ func (s *server) EndAuction(ctx context.Context, in *auction.Empty) (*auction.Re
 	s.clientsTerminated++
 	s.mutex.Unlock()
 
-	if s.clientsTerminated == s.clientCounter {
-		log.Println("Auction ended, all the clients have terminated...The sevrer is about to shut down")
+	if s.clientsTerminated == s.clientCounter  && terminate == 1{
+		log.Println("Auction ended, all the clients have terminated...The server is about to shut down")
 		defer os.Exit(0)
 	}
-
+	terminate = 1
 	return &auction.ResultResponse{HighestBidderId: s.highestBidder, HighestBid: s.highestBid}, nil
 }
 
