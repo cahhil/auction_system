@@ -14,16 +14,20 @@ import (
 var client_obj auction.AuctionServiceClient
 
 func main() {
+	arg, _ := strconv.ParseInt(os.Args[1], 10, 32)
+	id := int32(arg)
+
 	conn, client_obj := connect_to_server()
 
 	defer conn.Close()
+
 	for {
-		read_input(client_obj)
+		read_input(client_obj, id)
 	}
 
 }
 
-func read_input(client_obj auction.AuctionServiceClient) {
+func read_input(client_obj auction.AuctionServiceClient, id int32) {
 	scanner := bufio.NewScanner(os.Stdin)
 	log.Println("Type the keyword 'bid' to make a new bid or alternatively type 'result' to retrieve the highest bid")
 
@@ -51,7 +55,8 @@ func read_input(client_obj auction.AuctionServiceClient) {
 			}
 
 			bid := &auction.BidRequest{
-				Amount: int32(amount),
+				Amount:   int32(amount),
+				BidderID: id,
 			}
 
 			acknoledgement, err := client_obj.Bid(context.Background(), bid)

@@ -77,12 +77,11 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 	var status_obj status.Status
 
 	id := in.BidderID
+	log.Println(id)
 
 	//check if the client is already registered
-	//when creating a client in the client.go
-	//set his id to be zero so
-	//initizalizatino routine can be run
-	if in.BidderID == 0 {
+	//of not, register it
+	if !contains(s.clients, int(id)) {
 		//update the client id
 		//and add it to the list of clients
 		s.mutex.Lock()
@@ -90,6 +89,7 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 		id = s.clientCounter
 		s.clients = append(s.clients, id)
 		s.mutex.Unlock()
+		log.Println(id)
 
 	}
 
@@ -126,4 +126,13 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 func (s *server) Result(ctx context.Context, in *auction.ResultRequest) (*auction.ResultResponse, error) {
 
 	return &auction.ResultResponse{HighestBidderId: s.highestBidder, HighestBid: s.highestBid}, nil
+}
+
+func contains(s []int32, e int) bool {
+	for _, a := range s {
+		if int(a) == e {
+			return true
+		}
+	}
+	return false
 }
