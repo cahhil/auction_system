@@ -13,8 +13,10 @@ import (
 )
 
 var ports = []string{"8000", "8001", "8002"}
-
-var client_obj auction.AuctionServiceClient
+var replicas []auction.AuctionServiceClient 
+var maxBid = 0
+var terminate = 0
+// var client_obj auction.AuctionServiceClient
 
 func main() {
 	arg, _ := strconv.ParseInt(os.Args[1], 10, 32)
@@ -36,6 +38,8 @@ func main() {
 	conn_1, client_obj_1 := connect_to_server(0)
 	conn_2, client_obj_2 := connect_to_server(1)
 	conn_3, client_obj_3 := connect_to_server(2)
+	replicas = []auction.AuctionServiceClient{client_obj_1,client_obj_2, client_obj_3}
+
 
 	defer conn_1.Close()
 	defer conn_2.Close()
@@ -43,9 +47,15 @@ func main() {
 
 	go func() {
 		for {
-			if time.Now().Hour() == hour && time.Now().Minute() == minutes {
+			if terminate == 1{
+				break
+			}
+
+			if time.Now().Hour() == hour && time.Now().Minute() == minutes  && time.Now().Second() == 0{
 				log.Print("Timer expired, the auction is over.")
-				for _, client_obj := range []auction.AuctionServiceClient{client_obj_1, client_obj_2, client_obj_3} {
+				log.Println(replicas)
+				for _, client_obj := range replicas {
+					//log.Println("loop")
 					response, err := client_obj.EndAuction(context.Background(), &auction.Empty{})
 					if err != nil {
 						log.Fatalf("could not end the auction: %v", err)
@@ -53,19 +63,19 @@ func main() {
 
 					log.Printf("The winner is: %v with bid of value %v", response.HighestBidderId, response.HighestBid)
 
-					break
+					terminate = 1
 				}
 			}
 		}
 	}()
 
 	for {
-		read_input(client_obj_1, client_obj_2, client_obj_3, id)
+		read_input(id)
 	}
 
 }
 
-func read_input(client_obj_1 auction.AuctionServiceClient, client_obj_2 auction.AuctionServiceClient, client_obj_3 auction.AuctionServiceClient, id int32) {
+func read_input(id int32) {
 	scanner := bufio.NewScanner(os.Stdin)
 	log.Println("Type the keyword 'bid' to make a new bid or alternatively type 'result' to retrieve the highest bid")
 
@@ -75,41 +85,94 @@ func read_input(client_obj_1 auction.AuctionServiceClient, client_obj_2 auction.
 
 		switch {
 		case text == "result":
-			for i, client_obj := range []auction.AuctionServiceClient{client_obj_1, client_obj_2, client_obj_3} {
+			var resultFinal int32
+			m := make(map[int32]int32) // keep track of the number of times a number appear
+			for i, client_obj := range replicas {
 
 				result_obj := &auction.ResultRequest{}
 				result, err := client_obj.Result(context.Background(), result_obj)
 				if err != nil {
 					ports = remove(ports, i)
-					log.Fatalf("could not retrieve the result from server at port 800%v the server has been removed: %v", err, i)
+					replicas = remove2(replicas,i)
+					log.Printf("could not retrieve the result from server at port 800%v the server has been removed: %v", err, i)
+					continue
 				}
-				log.Println("The highest bid is: ", result)
+				//check if value exist 
+				_, prs := m[result.HighestBid]
+				if prs{
+					m[result.HighestBid] = m[result.HighestBid] + 1
+				}else{
+					m[result.HighestBid] = 1
+				}
+				// log.Println("The highest bid is: ", result)
 			}
+			var largest int32 = 0
+			for key, element := range m {
+				if element > largest{
+					resultFinal = key
+				}
+			}
+			log.Println("The highest bid is: ", resultFinal)
 
 		case text == "bid":
 			log.Println("Plese type the amount you would like to bid in the command line:")
 			scanner.Scan()
 			input := scanner.Text()
 			amount, err := strconv.Atoi(input)
-			if err != nil {
-				log.Fatal("The input you provided is not an integer, please try again.")
-			}
-
-			bid := &auction.BidRequest{
-				Amount:   int32(amount),
-				BidderID: id,
-			}
-
-			for _, client_obj := range []auction.AuctionServiceClient{client_obj_1, client_obj_2, client_obj_3} {
-				acknoledgement, err := client_obj.Bid(context.Background(), bid)
-
+			if amount < maxBid{
+				log.Println("The bid value is lower than the previous bid(s), please try again.")
+				
+			}else{
+				maxBid = amount
 				if err != nil {
-					log.Printf("Bid failed:")
-					log.Println(err)
+					log.Fatal("The input you provided is not an integer, please try again.")
 				}
-				log.Println(acknoledgement)
 
+				bid := &auction.BidRequest{
+					Amount:   int32(amount),
+					BidderID: id,
+				}
+
+				var ack int
+				var acks [3]int
+				acks =  [3]int{0,0,0}
+				for i, client_obj := range replicas {
+					acknowledgement, err := client_obj.Bid(context.Background(), bid)
+					if err != nil {
+						replicas = remove2(replicas,i)
+						 log.Println(i)
+						log.Println(err)
+						continue
+					}
+					if acknowledgement.Status == 0{
+						acks[0]++
+					}else if acknowledgement.Status == 1{
+						acks[1]++
+					}else{
+						acks[2]++
+					}
+					
+					
+
+				}
+				var biggest int
+				biggest = 0
+				for i,_ := range acks{
+					if acks[i] > biggest{
+						ack = i
+					}
+				}
+
+				if ack == 0{
+					log.Println("FAIL")
+				}else if ack == 1{
+					log.Println("SUCCESS")
+				}else{
+					log.Println("EXCEPTION")
+				}
+				
 			}
+			
 
 		default:
 			log.Println("The input inserted is not correct")
@@ -125,10 +188,30 @@ func connect_to_server(index int) (*grpc.ClientConn, auction.AuctionServiceClien
 	if err != nil {
 		log.Printf("Did not connect to port %v: %v", ports[index], err)
 		ports = remove(ports, index)
+
 	}
 	return conn, auction.NewAuctionServiceClient(conn)
 }
 
 func remove(slice []string, s int) []string {
 	return append(slice[:s], slice[s+1:]...)
+	var result []string
+	for i := range slice {
+		if(i != s){
+			result = append(result,slice[i])
+		}
+		
+	} 	
+	return result
+}
+
+func remove2(slice []auction.AuctionServiceClient , s int) []auction.AuctionServiceClient  {
+	var result []auction.AuctionServiceClient 
+	for i, client_obj := range slice {
+		if(i != s){
+			result = append(result, client_obj)
+		}
+		
+	} 	
+	return result
 }
