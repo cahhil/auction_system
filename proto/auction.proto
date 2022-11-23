@@ -9,6 +9,8 @@ service AuctionService {
     rpc Bid (BidRequest) returns (BidResponse) {}
     //the client can get the current highest bid alongside the highest bidder
     rpc Result (ResultRequest) returns (ResultResponse) {}
+    //the client notiifes the end of the auction
+    rpc EndAuction (Empty) returns (ResultResponse) {}
 }
 
 message BidRequest {
@@ -32,4 +34,7 @@ message ResultResponse {
 enum Status {
     FAIL = 0;
     SUCCESS = 1;
+    EXECPTION = 2;
 }
+
+message Empty {}

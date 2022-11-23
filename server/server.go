@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strconv"
 	"sync"
-	"time"
 
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
@@ -15,39 +16,38 @@ import (
 
 type server struct {
 	auction.UnimplementedAuctionServiceServer
-	ctx           context.Context
-	mutex         sync.Mutex
-	port          int32
-	highestBid    int32
-	highestBidder int32
-	clients       []int32
-	clientCounter int32
+	ctx               context.Context
+	mutex             sync.Mutex
+	port              int32
+	highestBid        int32
+	highestBidder     int32
+	clients           []int32
+	clientCounter     int32
+	clientsTerminated int32
 }
 
 func main() {
-	timer := time.NewTimer(60 * time.Second)
-	//get the first argument form teh command line
+
+	arg, _ := strconv.ParseInt(os.Args[1], 10, 32)
+	ownPort := int32(arg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	//convert port from string to integer
-	ownPort := int32(8000)
-
 	server := &server{
-		ctx:        ctx,
-		port:       ownPort,
-		highestBid: 0,
-		mutex:      sync.Mutex{},
-		clients:    make([]int32, 5),
+
+		ctx:               ctx,
+		port:              ownPort,
+		highestBid:        0,
+		mutex:             sync.Mutex{},
+		clients:           make([]int32, 5),
+		clientCounter:     0,
+		clientsTerminated: 0,
 	}
 
 	//start the server
 	initServer(server)
 
-	<-timer.C
-	log.Printf("Timer expired, the auction is over. The winner is client %v with a bid of %v",
-		server.highestBidder, server.highestBid)
 }
 
 func initServer(server *server) {
@@ -77,7 +77,7 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 	var status_obj status.Status
 
 	id := in.BidderID
-	log.Println(id)
+	log.Printf("the id of the bidder is: %v", id)
 
 	//check if the client is already registered
 	//of not, register it
@@ -86,10 +86,9 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 		//and add it to the list of clients
 		s.mutex.Lock()
 		s.clientCounter++
-		id = s.clientCounter
 		s.clients = append(s.clients, id)
 		s.mutex.Unlock()
-		log.Println(id)
+		log.Printf("the %v client has been registered", id)
 
 	}
 
@@ -124,6 +123,20 @@ func (s *server) Bid(ctx context.Context, in *auction.BidRequest) (*auction.BidR
 // the implementation of the Result method taking a context and a ResultRequest as input
 // and returning a ResultResponse as output
 func (s *server) Result(ctx context.Context, in *auction.ResultRequest) (*auction.ResultResponse, error) {
+
+	return &auction.ResultResponse{HighestBidderId: s.highestBidder, HighestBid: s.highestBid}, nil
+}
+
+func (s *server) EndAuction(ctx context.Context, in *auction.Empty) (*auction.ResultResponse, error) {
+
+	s.mutex.Lock()
+	s.clientsTerminated++
+	s.mutex.Unlock()
+
+	if s.clientsTerminated == s.clientCounter {
+		log.Println("Auction ended, all the clients have terminated...The sevrer is about to shut down")
+		defer os.Exit(0)
+	}
 
 	return &auction.ResultResponse{HighestBidderId: s.highestBidder, HighestBid: s.highestBid}, nil
 }

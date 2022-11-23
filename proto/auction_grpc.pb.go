@@ -22,6 +22,8 @@ type AuctionServiceClient interface {
 	Bid(ctx context.Context, in *BidRequest, opts ...grpc.CallOption) (*BidResponse, error)
 	// the client can get the current highest bid alongside the highest bidder
 	Result(ctx context.Context, in *ResultRequest, opts ...grpc.CallOption) (*ResultResponse, error)
+	// the client notiifes the end of the auction
+	EndAuction(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ResultResponse, error)
 }
 
 type auctionServiceClient struct {
@@ -50,6 +52,15 @@ func (c *auctionServiceClient) Result(ctx context.Context, in *ResultRequest, op
 	return out, nil
 }
 
+func (c *auctionServiceClient) EndAuction(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ResultResponse, error) {
+	out := new(ResultResponse)
+	err := c.cc.Invoke(ctx, "/auction_system.AuctionService/EndAuction", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuctionServiceServer is the server API for AuctionService service.
 // All implementations must embed UnimplementedAuctionServiceServer
 // for forward compatibility
@@ -58,6 +69,8 @@ type AuctionServiceServer interface {
 	Bid(context.Context, *BidRequest) (*BidResponse, error)
 	// the client can get the current highest bid alongside the highest bidder
 	Result(context.Context, *ResultRequest) (*ResultResponse, error)
+	// the client notiifes the end of the auction
+	EndAuction(context.Context, *Empty) (*ResultResponse, error)
 	mustEmbedUnimplementedAuctionServiceServer()
 }
 
@@ -70,6 +83,9 @@ func (UnimplementedAuctionServiceServer) Bid(context.Context, *BidRequest) (*Bid
 }
 func (UnimplementedAuctionServiceServer) Result(context.Context, *ResultRequest) (*ResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Result not implemented")
+}
+func (UnimplementedAuctionServiceServer) EndAuction(context.Context, *Empty) (*ResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EndAuction not implemented")
 }
 func (UnimplementedAuctionServiceServer) mustEmbedUnimplementedAuctionServiceServer() {}
 
@@ -120,6 +136,24 @@ func _AuctionService_Result_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuctionService_EndAuction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuctionServiceServer).EndAuction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/auction_system.AuctionService/EndAuction",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuctionServiceServer).EndAuction(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuctionService_ServiceDesc is the grpc.ServiceDesc for AuctionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +168,10 @@ var AuctionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Result",
 			Handler:    _AuctionService_Result_Handler,
+		},
+		{
+			MethodName: "EndAuction",
+			Handler:    _AuctionService_EndAuction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

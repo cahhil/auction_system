@@ -1,5 +1,5 @@
 # Auction_system
 
-To run the server type ``` go run server/server.go```.
-After that is possible to run the client by typing ``` go run client/client.go```
+To run the server type ``` go run server/server.go <PORT_NUMBER> <hour:minutes>```. Where <PORT_NUMER> is either 800, 8001, 8002...
+After that is possible to run the client by typing ``` go run client/client.go <ID> <hour:minutes>```
 As long as the server is running as many clients as one desires can be started and stopped...
