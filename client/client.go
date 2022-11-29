@@ -46,6 +46,7 @@ func main() {
 	defer conn_3.Close()
 
 	go func() {
+		var result *auction.ResultResponse
 		for {
 			if terminate == 1{
 				break
@@ -58,13 +59,16 @@ func main() {
 					//log.Println("loop")
 					response, err := client_obj.EndAuction(context.Background(), &auction.Empty{})
 					if err != nil {
-						log.Fatalf("could not end the auction: %v", err)
+						log.Printf("could not end the auction: %v", err)
+						continue
 					}
 
-					log.Printf("The winner is: %v with bid of value %v", response.HighestBidderId, response.HighestBid)
-
-					terminate = 1
+					
+					result = response
+					
 				}
+				log.Printf("The winner is: %v with bid of value %v", result.HighestBidderId, result.HighestBid)
+				terminate = 1
 			}
 		}
 	}()
